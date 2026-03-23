@@ -1,0 +1,20 @@
+# Dependências para Stress Test
+# ==============================
+
+# HTTP Client assíncrono
+httpx>=0.25.0
+
+# Locust para testes de carga profissionais
+locust>=2.20.0
+
+# Output bonito no console
+rich>=13.0.0
+
+# Monitoramento de recursos do sistema
+psutil>=5.9.0
+
+# Validação de dados
+pydantic>=2.0.0
+
+# Geração de dados fake (opcional)
+faker>=20.0.0

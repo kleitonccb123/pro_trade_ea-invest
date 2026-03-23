@@ -1,0 +1,611 @@
+//+------------------------------------------------------------------+
+//| Expert Advisor: PRICEPRO_H1                                      |
+//| Variante: TREND RIDER — Gráfico H1                               |
+//| Estratégia: Tendência forte com filtros estritos                  |
+//| Lógica: RSI a favor do impulso (≥50 compra / ≤50 venda)          |
+//|          Candle de força mínimo 50% de corpo                      |
+//|          Média Móvel EMA 21 como filtro de tendência              |
+//|          TP/SL maiores para capturar movimentos de H1             |
+//+------------------------------------------------------------------+
+#property copyright "PRICEPRO"
+#property link      "https://www.greaterwaves.com"
+#property version   "1.00"
+#property strict
+
+#include <Trade/Trade.mqh>
+
+//+------------------------------------------------------------------+
+//| SISTEMA DE VALIDAÇÃO DE LICENÇA
+//+------------------------------------------------------------------+
+#define LICENSE_DOMAIN      "pricepro-licencas.site"
+#define LICENSE_ENDPOINT    "/api.php?conta="
+#define LICENSE_TIMEOUT     5000
+#define LICENSE_MAX_RETRIES 3
+
+bool     g_licenseValidated = false;
+datetime g_licenseExpire    = 0;
+string   g_licenseAccountID = "";
+
+bool CheckLicense()
+{
+   long account_login = AccountInfoInteger(ACCOUNT_LOGIN);
+   if(account_login <= 0) { Alert("ERRO: conta inválida"); return false; }
+   string login = IntegerToString((int)account_login);
+   g_licenseAccountID = login;
+   string protos[2] = {"https://", "http://"};
+   for(int p = 0; p < 2; p++)
+   {
+      string url = protos[p] + LICENSE_DOMAIN + LICENSE_ENDPOINT + login;
+      for(int attempt = 0; attempt < LICENSE_MAX_RETRIES; attempt++)
+      {
+         if(ValidarLicencaViaAPI(url)) return true;
+         if(attempt < LICENSE_MAX_RETRIES - 1) Sleep(2000);
+      }
+   }
+   Alert("ERRO: Licença inválida. Contate: pricepro-licencas.site");
+   return false;
+}
+
+bool ValidarLicencaViaAPI(const string url)
+{
+   uchar post[], result[];
+   string result_headers = "", headers = "";
+   ArrayResize(result, 0);
+   int res = WebRequest("GET", url, headers, LICENSE_TIMEOUT, post, result, result_headers);
+   if(res == -1) { Print("WebRequest falhou: ", url, " | Erro: ", GetLastError()); return false; }
+   string response = CharArrayToString(result, 0, ArraySize(result));
+   string response_upper = response;
+   StringToUpper(response_upper);
+   if(StringFind(response_upper, "AUTORIZAD") >= 0 || StringFind(response_upper, "AUTHORIZED") >= 0)
+   {
+      ProcessarRespostaLicenca(response);
+      g_licenseValidated = true;
+      string expTxt = (g_licenseExpire > 0) ? TimeToString(g_licenseExpire, TIME_DATE | TIME_MINUTES) : "(sem expiração)";
+      Comment("✓ Licença: " + g_licenseAccountID + " | Expira: " + expTxt);
+      return true;
+   }
+   return false;
+}
+
+void ProcessarRespostaLicenca(const string response)
+{
+   uchar arr[];
+   int len = StringToCharArray(response, arr);
+   for(int i = 0; i < len; i++)
+   {
+      if(arr[i] >= '0' && arr[i] <= '9')
+      {
+         int j = i;
+         while(j < len && arr[j] >= '0' && arr[j] <= '9') j++;
+         int num_len = j - i;
+         if(num_len >= 8) { g_licenseExpire = (datetime)StringToInteger(StringSubstr(response, i, num_len)); break; }
+         i = j;
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| PARÂMETROS — TREND RIDER H1
+//+------------------------------------------------------------------+
+input bool   AtivarEA              = true;
+input bool   ModoDebug             = false;
+
+//--- Filtros
+input bool   UsarRSI               = true;
+input bool   RSI_ImpulsoMode       = true;    // true=impulso (RSI≥50/≤50), false=retração (extremos)
+input bool   UsarForcaCandle       = true;
+input bool   UsarVolume            = true;
+input bool   UsarRangeAdaptativo   = true;
+
+//--- Volume/Lote
+input bool   UsarLoteFixo          = true;
+input double LoteFixo              = 0.05;
+input bool   UsarLotePorRisco      = false;
+input double PercentualRisco       = 10.0;
+
+//--- Média Móvel — EMA 21 ideal para H1 (tendência de curto/médio prazo)
+input bool   AtivarMediaMovel      = true;
+input int    PeriodoMediaMovel     = 21;
+input ENUM_MA_METHOD TipoMedia     = MODE_EMA;
+
+//--- RSI — período 14 clássico + níveis mais centrais (40/60) captura mais trades em H1
+input int    PeriodoRSI            = 14;
+input double RSI_Sobrecomprado     = 60.0;
+input double RSI_Sobrevendido      = 40.0;
+
+//--- Força do Candle — mínimo 50% no H1 (candles fracos = correção sem força)
+input double CorpoCandleMinimo     = 50.0;
+
+//--- Volume — fator mais alto porque volume fraco em H1 indica falta de participação institucional
+input double VolumeMinimo          = 0.70;
+
+//--- Range Adaptativo — mais estrito para garantir expansão real em H1
+input int    PeriodoRange          = 9;
+input double MultiplicadorRange    = 1.30;
+
+//--- TP/SL maiores (H1 tem movimentos de 20-50 USD por operação)
+input double TP_USD                = 25.0;
+input double SL_USD                = 15.0;
+
+//--- Gestão Financeira
+input double MetaDiaria            = 0.0;
+input double LimitePercaDiaria     = 0.0;
+input double DrawdownEmergencia    = 50.0;
+
+//--- Geral
+input ulong  NumeroMagico          = 20260001;
+input ENUM_TIMEFRAMES TempoGrafico = PERIOD_H1;
+
+//--- Breakeven + Trailing (H1: ativar mais tarde = 800 pontos)
+input int    BreakevenActivatePoints = 800;
+input bool   AtivarTrailingPorCandle = true;
+input int    MinMovePoints           = 1;
+
+//+------------------------------------------------------------------+
+//| Globais
+//+------------------------------------------------------------------+
+CTrade trade;
+int  ema_handle    = INVALID_HANDLE;
+int  rsi_handle    = INVALID_HANDLE;
+
+double g_MetaDiaria          = 0.0;
+double g_LimitePercaDiaria   = 0.0;
+bool   g_AtivarEA            = true;
+double g_initialEquity       = 0.0;
+bool   g_dailyBlocked        = false;
+bool   g_emergencyBlocked    = false;
+int    g_blockedYear         = 0;
+int    g_blockedYDay         = 0;
+double g_blockedMetaDiaria   = 0.0;
+double g_blockedLimitePercaDiaria = 0.0;
+datetime g_lastBarTime       = 0;
+
+#define PP_BG     "H1_BG"
+#define PP_TITLE  "H1_TITLE"
+#define PP_PROFIT "H1_PROFIT"
+#define PP_VALUE  "H1_VALUE"
+
+color C_BG_DARK = C'15,25,50';
+color C_TXT     = clrWhite;
+color C_OK      = clrLime;
+color C_BAD     = clrRed;
+
+ulong  g_lastStatsUpdateTick = 0;
+double g_cachedDailyProfit   = 0.0;
+ulong  g_lastPanelUpdate     = 0;
+ulong  g_lastHasPosTick      = 0;
+bool   g_cachedHasPos        = false;
+
+ulong    g_breakevenTickets[];
+datetime g_breakevenLastModifiedBar[];
+
+#define DIR_NONE   0
+#define DIR_BUY    1
+#define DIR_SELL  -1
+
+//+------------------------------------------------------------------+
+double PipSize()
+{
+   int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+   return (digits == 3 || digits == 5) ? _Point * 10.0 : _Point;
+}
+
+double MoneyToPriceDistance(double money, double volume)
+{
+   if(money <= 0.0 || volume <= 0.0) return 0.0;
+   double tick_value = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+   double tick_size  = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+   if(tick_value <= 0.0 || tick_size <= 0.0) return 0.0;
+   return (money * tick_size) / (tick_value * volume);
+}
+
+double CalculateLotSize()
+{
+   double lot = 0.01;
+   if(UsarLoteFixo) lot = LoteFixo;
+   else if(UsarLotePorRisco)
+   {
+      double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+      double riskAmount = balance * (PercentualRisco / 100.0);
+      lot = riskAmount / 1000.0;
+   }
+   double minLot  = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+   double maxLot  = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
+   double lotStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+   if(minLot > 0.0) lot = MathMax(lot, minLot);
+   if(maxLot > 0.0) lot = MathMin(lot, maxLot);
+   if(lotStep > 0.0) lot = MathRound(lot / lotStep) * lotStep;
+   return NormalizeDouble(lot, 2);
+}
+
+bool IsNewBar()
+{
+   datetime t = iTime(_Symbol, PERIOD_CURRENT, 0);
+   if(t != 0 && t != g_lastBarTime) { g_lastBarTime = t; return true; }
+   return false;
+}
+
+bool GetEMA(double &ema_out)
+{
+   ema_out = 0.0;
+   if(ema_handle == INVALID_HANDLE) return false;
+   double buf[1];
+   if(CopyBuffer(ema_handle, 0, 1, 1, buf) <= 0) return false;
+   ema_out = buf[0];
+   return true;
+}
+
+bool GetRSI(double &rsi_out)
+{
+   rsi_out = 0.0;
+   if(rsi_handle == INVALID_HANDLE) return false;
+   double buf[1];
+   if(CopyBuffer(rsi_handle, 0, 1, 1, buf) <= 0) return false;
+   rsi_out = buf[0];
+   return true;
+}
+
+double GetCandleBodyPercent()
+{
+   double range = iHigh(_Symbol, PERIOD_CURRENT, 1) - iLow(_Symbol, PERIOD_CURRENT, 1);
+   if(range <= 0.0) return 0.0;
+   return (MathAbs(iClose(_Symbol, PERIOD_CURRENT, 1) - iOpen(_Symbol, PERIOD_CURRENT, 1)) / range) * 100.0;
+}
+
+double GetVolumeRatio()
+{
+   double v1 = (double)iVolume(_Symbol, PERIOD_CURRENT, 1);
+   double v2 = (double)iVolume(_Symbol, PERIOD_CURRENT, 2);
+   double v3 = (double)iVolume(_Symbol, PERIOD_CURRENT, 3);
+   double avg = (v1 + v2 + v3) / 3.0;
+   return (avg <= 0.0) ? 0.0 : v1 / avg;
+}
+
+double GetRangeRatio()
+{
+   double range1 = iHigh(_Symbol, PERIOD_CURRENT, 1) - iLow(_Symbol, PERIOD_CURRENT, 1);
+   if(range1 <= 0.0) return 0.0;
+   double sum = 0.0; int count = 0;
+   for(int i = 1; i <= PeriodoRange; i++)
+   {
+      double r = iHigh(_Symbol, PERIOD_CURRENT, i) - iLow(_Symbol, PERIOD_CURRENT, i);
+      if(r > 0.0) { sum += r; count++; }
+   }
+   if(count == 0) return 0.0;
+   double avg = sum / count;
+   return (avg <= 0.0) ? 0.0 : range1 / avg;
+}
+
+double GetDailyProfit()
+{
+   ulong now = GetTickCount64();
+   if(now - g_lastStatsUpdateTick < 1000) return g_cachedDailyProfit;
+   g_lastStatsUpdateTick = now;
+   MqlDateTime dt;
+   TimeToStruct(TimeCurrent(), dt);
+   dt.hour = 0; dt.min = 0; dt.sec = 0;
+   if(!HistorySelect(StructToTime(dt), TimeCurrent())) return g_cachedDailyProfit;
+   double profit = 0.0;
+   int deals = HistoryDealsTotal();
+   for(int i = 0; i < deals; i++)
+   {
+      ulong ticket = HistoryDealGetTicket(i);
+      if(ticket == 0) continue;
+      profit += HistoryDealGetDouble(ticket, DEAL_PROFIT)
+              + HistoryDealGetDouble(ticket, DEAL_SWAP)
+              + HistoryDealGetDouble(ticket, DEAL_COMMISSION);
+   }
+   g_cachedDailyProfit = profit;
+   return profit;
+}
+
+double GetAccountDrawdownPercent()
+{
+   if(g_initialEquity <= 0.0) return 0.0;
+   double dd = g_initialEquity - AccountInfoDouble(ACCOUNT_EQUITY);
+   return (dd <= 0.0) ? 0.0 : (dd / g_initialEquity) * 100.0;
+}
+
+bool HasOpenPositions()
+{
+   ulong now = GetTickCount64();
+   if(now - g_lastHasPosTick < 50) return g_cachedHasPos;
+   g_lastHasPosTick = now;
+   g_cachedHasPos = false;
+   int total = PositionsTotal();
+   for(int i = 0; i < total; i++)
+   {
+      ulong t = PositionGetTicket(i);
+      if(t == 0) continue;
+      if(PositionGetString(POSITION_SYMBOL) == _Symbol && (ulong)PositionGetInteger(POSITION_MAGIC) == NumeroMagico)
+      { g_cachedHasPos = true; break; }
+   }
+   return g_cachedHasPos;
+}
+
+void CloseAllPositions()
+{
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket == 0) continue;
+      if(PositionGetString(POSITION_SYMBOL) == _Symbol && (ulong)PositionGetInteger(POSITION_MAGIC) == NumeroMagico)
+         trade.PositionClose(ticket);
+   }
+}
+
+//--- CheckTrend com confirmação dupla no H1:
+//    Além do preço vs EMA, exige que o candle anterior confirme direção
+bool CheckTrend(int &direction)
+{
+   direction = DIR_NONE;
+   if(!AtivarMediaMovel) { direction = DIR_BUY; return true; }
+   double ema;
+   if(!GetEMA(ema)) return false;
+   double close1 = iClose(_Symbol, PERIOD_CURRENT, 1);
+   double open1  = iOpen(_Symbol, PERIOD_CURRENT, 1);
+
+   // Exige alinhamento: preço acima da EMA E candle alta
+   if(close1 > ema && close1 > open1) direction = DIR_BUY;
+   else if(close1 < ema && close1 < open1) direction = DIR_SELL;
+   else direction = DIR_NONE;
+
+   return (direction != DIR_NONE);
+}
+
+bool CheckRSI(int direction)
+{
+   if(!UsarRSI) return true;
+   double rsi;
+   if(!GetRSI(rsi)) return false;
+   if(RSI_ImpulsoMode)
+   {
+      if(direction == DIR_BUY)  return (rsi >= 50.0);
+      if(direction == DIR_SELL) return (rsi <= 50.0);
+   }
+   else
+   {
+      if(direction == DIR_BUY)  return (rsi <= RSI_Sobrevendido);
+      if(direction == DIR_SELL) return (rsi >= RSI_Sobrecomprado);
+   }
+   return false;
+}
+
+bool CheckCandleStrength() { return (!UsarForcaCandle) ? true : GetCandleBodyPercent() >= CorpoCandleMinimo; }
+bool CheckVolume()          { return (!UsarVolume)      ? true : GetVolumeRatio()       >= VolumeMinimo; }
+bool CheckRangeAdaptive()   { return (!UsarRangeAdaptativo) ? true : GetRangeRatio()   >= MultiplicadorRange; }
+bool CanOpenNewPosition()   { return g_AtivarEA && !g_dailyBlocked && !g_emergencyBlocked; }
+
+void OpenPosition(int direction, double volume)
+{
+   if(!CanOpenNewPosition()) return;
+   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   if(ask <= 0.0 || bid <= 0.0) return;
+   volume = NormalizeDouble(volume, 2);
+   if(volume <= 0.0) return;
+   double price  = (direction == DIR_BUY ? ask : bid);
+   double tpDist = MoneyToPriceDistance(TP_USD, volume);
+   double slDist = MoneyToPriceDistance(SL_USD, volume);
+   double tp = 0.0, sl = 0.0;
+   if(tpDist > 0.0) tp = (direction == DIR_BUY) ? price + tpDist : price - tpDist;
+   if(slDist > 0.0) sl = (direction == DIR_BUY) ? price - slDist : price + slDist;
+   trade.SetExpertMagicNumber(NumeroMagico);
+   bool result = (direction == DIR_BUY) ? trade.Buy(volume, _Symbol, price, sl, tp)
+                                        : trade.Sell(volume, _Symbol, price, sl, tp);
+   if(!result && ModoDebug) Print("ERRO ao enviar ordem: ", trade.ResultRetcodeDescription());
+   else if(ModoDebug) Print("ORDEM: ", (direction == DIR_BUY ? "COMPRA" : "VENDA"), " Vol:", volume, " P:", price, " SL:", sl, " TP:", tp);
+}
+
+void CheckDailyStops()
+{
+   MqlDateTime dt; TimeToStruct(TimeCurrent(), dt);
+   static int lastYear = 0, lastYDay = 0;
+   if(lastYear == 0) { lastYear = dt.year; lastYDay = dt.day_of_year; }
+   else if(dt.year != lastYear || dt.day_of_year != lastYDay) { g_dailyBlocked = false; lastYear = dt.year; lastYDay = dt.day_of_year; }
+   if(g_dailyBlocked) return;
+   double dp = GetDailyProfit();
+   if(g_MetaDiaria > 0.0 && dp >= g_MetaDiaria)          { CloseAllPositions(); g_dailyBlocked = true; }
+   if(g_LimitePercaDiaria > 0.0 && dp <= -g_LimitePercaDiaria) { CloseAllPositions(); g_dailyBlocked = true; }
+}
+
+void CheckEmergencyStop()
+{
+   if(g_emergencyBlocked || DrawdownEmergencia <= 0.0) return;
+   if(GetAccountDrawdownPercent() >= DrawdownEmergencia) { CloseAllPositions(); g_emergencyBlocked = true; }
+}
+
+void UIPanel_Create()
+{
+   ObjectCreate(0, PP_BG, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, PP_BG, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, PP_BG, OBJPROP_XDISTANCE, 10); ObjectSetInteger(0, PP_BG, OBJPROP_YDISTANCE, 20);
+   ObjectSetInteger(0, PP_BG, OBJPROP_XSIZE, 240);    ObjectSetInteger(0, PP_BG, OBJPROP_YSIZE, 85);
+   ObjectSetInteger(0, PP_BG, OBJPROP_BGCOLOR, C_BG_DARK);
+   ObjectSetInteger(0, PP_BG, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+   ObjectSetInteger(0, PP_BG, OBJPROP_COLOR, C'30,50,80'); ObjectSetInteger(0, PP_BG, OBJPROP_WIDTH, 2);
+
+   ObjectCreate(0, PP_TITLE, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, PP_TITLE, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, PP_TITLE, OBJPROP_XDISTANCE, 22); ObjectSetInteger(0, PP_TITLE, OBJPROP_YDISTANCE, 28);
+   ObjectSetInteger(0, PP_TITLE, OBJPROP_FONTSIZE, 10);   ObjectSetInteger(0, PP_TITLE, OBJPROP_COLOR, C_TXT);
+   ObjectSetString(0, PP_TITLE, OBJPROP_FONT, "Arial Bold");
+   ObjectSetString(0, PP_TITLE, OBJPROP_TEXT, "PRICEPRO H1 – Trend Rider");
+
+   ObjectCreate(0, PP_PROFIT, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, PP_PROFIT, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, PP_PROFIT, OBJPROP_XDISTANCE, 22); ObjectSetInteger(0, PP_PROFIT, OBJPROP_YDISTANCE, 55);
+   ObjectSetInteger(0, PP_PROFIT, OBJPROP_FONTSIZE, 9);   ObjectSetInteger(0, PP_PROFIT, OBJPROP_COLOR, C_TXT);
+   ObjectSetString(0, PP_PROFIT, OBJPROP_FONT, "Arial"); ObjectSetString(0, PP_PROFIT, OBJPROP_TEXT, "Lucro do Dia:");
+
+   ObjectCreate(0, PP_VALUE, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, PP_VALUE, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, PP_VALUE, OBJPROP_XDISTANCE, 120); ObjectSetInteger(0, PP_VALUE, OBJPROP_YDISTANCE, 55);
+   ObjectSetInteger(0, PP_VALUE, OBJPROP_FONTSIZE, 11);   ObjectSetInteger(0, PP_VALUE, OBJPROP_COLOR, C_OK);
+   ObjectSetString(0, PP_VALUE, OBJPROP_FONT, "Arial Bold"); ObjectSetString(0, PP_VALUE, OBJPROP_TEXT, "0.00 USD");
+}
+
+void UIPanel_Delete() { ObjectDelete(0, PP_BG); ObjectDelete(0, PP_TITLE); ObjectDelete(0, PP_PROFIT); ObjectDelete(0, PP_VALUE); }
+
+void UIPanel_Update()
+{
+   double dp = GetDailyProfit();
+   string txt = (dp >= 0) ? "+" + DoubleToString(dp, 2) + " USD" : DoubleToString(dp, 2) + " USD";
+   ObjectSetString(0, PP_VALUE, OBJPROP_TEXT, txt);
+   ObjectSetInteger(0, PP_VALUE, OBJPROP_COLOR, (dp >= 0) ? C_OK : C_BAD);
+}
+
+//--- Breakeven helpers
+int FindBreakevenIndex(ulong ticket)
+{
+   int n = ArraySize(g_breakevenTickets);
+   for(int i = 0; i < n; i++) if(g_breakevenTickets[i] == ticket) return i;
+   return -1;
+}
+void AddBreakevenTicket(ulong ticket)
+{
+   if(FindBreakevenIndex(ticket) != -1) return;
+   int n = ArraySize(g_breakevenTickets);
+   ArrayResize(g_breakevenTickets, n + 1); ArrayResize(g_breakevenLastModifiedBar, n + 1);
+   g_breakevenTickets[n] = ticket; g_breakevenLastModifiedBar[n] = 0;
+}
+void RemoveBreakevenAt(int idx)
+{
+   int n = ArraySize(g_breakevenTickets);
+   if(idx < 0 || idx >= n) return;
+   for(int i = idx; i < n - 1; i++) { g_breakevenTickets[i] = g_breakevenTickets[i+1]; g_breakevenLastModifiedBar[i] = g_breakevenLastModifiedBar[i+1]; }
+   ArrayResize(g_breakevenTickets, n - 1); ArrayResize(g_breakevenLastModifiedBar, n - 1);
+}
+void PruneBreakevenTickets()
+{
+   int n = ArraySize(g_breakevenTickets);
+   for(int i = n - 1; i >= 0; i--)
+   {
+      bool found = false;
+      for(int j = 0; j < PositionsTotal(); j++) { if(PositionGetTicket(j) == g_breakevenTickets[i]) { found = true; break; } }
+      if(!found) RemoveBreakevenAt(i);
+   }
+}
+void ManagePositionStops()
+{
+   PruneBreakevenTickets();
+   datetime curBarTime = iTime(_Symbol, PERIOD_CURRENT, 0);
+   for(int i = 0; i < PositionsTotal(); i++)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket == 0) continue;
+      if(PositionGetString(POSITION_SYMBOL) != _Symbol || (ulong)PositionGetInteger(POSITION_MAGIC) != NumeroMagico) continue;
+      long   type      = PositionGetInteger(POSITION_TYPE);
+      double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
+      double curSL     = PositionGetDouble(POSITION_SL);
+      double curTP     = PositionGetDouble(POSITION_TP);
+      double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+      bool   hasBreakeven = (FindBreakevenIndex(ticket) != -1);
+
+      if(!hasBreakeven)
+      {
+         double diff = (type == POSITION_TYPE_BUY) ? (bid - openPrice) / _Point : (openPrice - ask) / _Point;
+         if(diff >= (double)BreakevenActivatePoints)
+         {
+            double newSL = NormalizeDouble(openPrice, (int)_Digits);
+            bool move = (curSL <= 0.0) ||
+                        (type == POSITION_TYPE_BUY  && newSL > curSL + MinMovePoints * _Point) ||
+                        (type == POSITION_TYPE_SELL && newSL < curSL - MinMovePoints * _Point);
+            if(move)
+            {
+               bool mod = trade.PositionModify(ticket, newSL, curTP);
+               if(ModoDebug) Print("Breakeven H1 ticket=", ticket, " SL=", newSL, " ok=", mod);
+               AddBreakevenTicket(ticket);
+               int idx = FindBreakevenIndex(ticket);
+               if(idx != -1) g_breakevenLastModifiedBar[idx] = curBarTime;
+            }
+         }
+      }
+      else if(AtivarTrailingPorCandle)
+      {
+         int idx = FindBreakevenIndex(ticket);
+         datetime prevBar = iTime(_Symbol, PERIOD_CURRENT, 1);
+         if(prevBar == 0 || (idx != -1 && g_breakevenLastModifiedBar[idx] == prevBar)) continue;
+         double newSL = NormalizeDouble((type == POSITION_TYPE_BUY) ? iLow(_Symbol, PERIOD_CURRENT, 1) : iHigh(_Symbol, PERIOD_CURRENT, 1), (int)_Digits);
+         bool move = (curSL <= 0.0) ?
+                     ((type == POSITION_TYPE_BUY && newSL >= openPrice + MinMovePoints*_Point) || (type == POSITION_TYPE_SELL && newSL <= openPrice - MinMovePoints*_Point)) :
+                     ((type == POSITION_TYPE_BUY && newSL > curSL + MinMovePoints*_Point) || (type == POSITION_TYPE_SELL && newSL < curSL - MinMovePoints*_Point));
+         if(move && MathAbs(newSL - curSL) >= _Point * MinMovePoints)
+         {
+            bool mod = trade.PositionModify(ticket, newSL, curTP);
+            if(ModoDebug) Print("Trailing H1 ticket=", ticket, " SL=", newSL, " ok=", mod);
+            if(idx == -1) AddBreakevenTicket(ticket);
+            idx = FindBreakevenIndex(ticket);
+            if(idx != -1) g_breakevenLastModifiedBar[idx] = prevBar;
+         }
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+int OnInit()
+{
+   if(!CheckLicense()) { Alert("Licença inválida."); return INIT_FAILED; }
+   if(Period() != TempoGrafico) Print("Aviso: Este EA é otimizado para H1.");
+   trade.SetExpertMagicNumber(NumeroMagico);
+   g_initialEquity        = AccountInfoDouble(ACCOUNT_EQUITY);
+   g_MetaDiaria           = MetaDiaria;
+   g_LimitePercaDiaria    = LimitePercaDiaria;
+   g_AtivarEA             = AtivarEA;
+   ema_handle = iMA(_Symbol, PERIOD_CURRENT, PeriodoMediaMovel, 0, TipoMedia, PRICE_CLOSE);
+   if(ema_handle == INVALID_HANDLE) { Print("Erro EMA"); return INIT_FAILED; }
+   rsi_handle = iRSI(_Symbol, PERIOD_CURRENT, PeriodoRSI, PRICE_CLOSE);
+   if(rsi_handle == INVALID_HANDLE) { Print("Erro RSI"); return INIT_FAILED; }
+   UIPanel_Create();
+   Print("PRICEPRO H1 - Trend Rider iniciado | Magic=", NumeroMagico, " | EMA=", PeriodoMediaMovel, " | RSI=", PeriodoRSI);
+   return INIT_SUCCEEDED;
+}
+
+void OnDeinit(const int reason)
+{
+   if(ema_handle != INVALID_HANDLE) IndicatorRelease(ema_handle);
+   if(rsi_handle != INVALID_HANDLE) IndicatorRelease(rsi_handle);
+   UIPanel_Delete();
+}
+
+void OnTick()
+{
+   static ulong s_lastFinCheck = 0;
+   ulong nowTick = GetTickCount64();
+   if(nowTick - s_lastFinCheck > 200) { CheckDailyStops(); CheckEmergencyStop(); s_lastFinCheck = nowTick; }
+   if(nowTick - g_lastPanelUpdate > 1000) { UIPanel_Update(); g_lastPanelUpdate = nowTick; }
+
+   if(IsNewBar())
+   {
+      int dir;
+      if(!CheckTrend(dir) || dir == DIR_NONE) return;
+      if(!CanOpenNewPosition() || HasOpenPositions()) return;
+
+      double rsiVal = 0.0; GetRSI(rsiVal);
+      bool okRSI    = CheckRSI(dir);
+      bool okCandle = CheckCandleStrength();
+      bool okVol    = CheckVolume();
+      bool okRange  = CheckRangeAdaptive();
+
+      if(ModoDebug)
+      {
+         string d = (dir == DIR_BUY ? "COMPRA" : "VENDA");
+         Print("H1 [", d, "] RSI=", DoubleToString(rsiVal,1), " ok=", okRSI,
+               " Candle=", DoubleToString(GetCandleBodyPercent(),1), "% ok=", okCandle,
+               " Vol=", DoubleToString(GetVolumeRatio(),2), " ok=", okVol,
+               " Range=", DoubleToString(GetRangeRatio(),2), " ok=", okRange);
+      }
+
+      if(okRSI && okCandle && okVol && okRange)
+      {
+         double vol = CalculateLotSize();
+         if(vol <= 0.0) vol = 0.01;
+         OpenPosition(dir, vol);
+      }
+   }
+
+   ManagePositionStops();
+}
+
+void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam) {}

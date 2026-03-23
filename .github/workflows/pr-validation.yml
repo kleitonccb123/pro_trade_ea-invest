@@ -1,0 +1,135 @@
+# ===============================================
+# 🔍 PR Validation - Crypto Trade Hub
+# ===============================================
+#
+# Workflow para validar Pull Requests antes do merge.
+# Não faz deploy, apenas valida código.
+#
+# ===============================================
+
+name: 🔍 PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    types: [opened, synchronize, reopened]
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ============================================
+  # 🧪 Validação de Código
+  # ============================================
+  validate:
+    name: 🔍 Validar Código
+    runs-on: ubuntu-latest
+    
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: 'backend/requirements.txt'
+
+      - name: 📦 Instalar dependências Backend
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio ruff mypy
+
+      - name: 🔍 Lint Backend (Ruff)
+        run: |
+          cd backend
+          ruff check app/ --output-format=github
+
+      - name: 🔍 Type Check (MyPy)
+        continue-on-error: true
+        run: |
+          cd backend
+          mypy app/ --ignore-missing-imports
+
+      - name: 🧪 Testes Backend
+        env:
+          MONGODB_URL: mongodb://localhost:27017
+          DATABASE_NAME: test_db
+          OFFLINE_MODE: "true"
+          APP_MODE: "test"
+        run: |
+          cd backend
+          python -m pytest tests/ -v --tb=short --cov=app --cov-report=term-missing
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Instalar dependências Frontend
+        run: npm ci
+
+      - name: 🔍 Lint Frontend
+        run: npm run lint
+
+      - name: 🧪 Testes Frontend
+        run: npx vitest run --reporter=verbose
+
+      - name: 🏗️ Build Frontend
+        run: npm run build
+
+      - name: 📊 Comentar no PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ **Validação concluída!**\n\nO código passou nas verificações básicas e está pronto para review.'
+            })
+        continue-on-error: true
+
+  # ============================================
+  # 🐳 Validar Dockerfiles
+  # ============================================
+  docker-lint:
+    name: 🐳 Validar Dockerfiles
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 🐳 Lint Dockerfiles
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: backend/Dockerfile
+          ignore: DL3008,DL3013
+        continue-on-error: true
+
+      - name: 🏗️ Testar build do Backend
+        run: |
+          docker build -t test-backend ./backend --no-cache
+          docker image rm test-backend
+
+      - name: 🏗️ Testar build do Frontend
+        run: |
+          docker build -t test-frontend . --no-cache
+          docker image rm test-frontend
+        continue-on-error: true

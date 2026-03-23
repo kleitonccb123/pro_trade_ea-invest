@@ -1,0 +1,479 @@
+# ======================================
+# Crypto Trade Hub - Production Environment
+# ======================================
+# Enterprise-grade Docker Compose for Production
+# 
+# Features:
+# - MongoDB with authentication and persistence
+# - Redis with RDB + AOF persistence (critical for Lock State)
+# - FastAPI Backend with 4 Gunicorn+Uvicorn workers
+# - Nginx reverse proxy with WebSocket support
+# - Isolated backend_network (no direct DB access from outside)
+# - Health checks for all services
+# - Resource limits and reservations
+# - Non-root users for security
+#
+# Usage:
+#   docker-compose -f docker-compose.prod.yml up -d
+#   docker-compose -f docker-compose.prod.yml logs -f backend
+#
+# ======================================
+
+version: '3.9'
+
+services:
+  # ==================== MONGODB ====================
+  mongodb:
+    image: mongo:7.0-alpine
+    container_name: crypto-trade-mongodb
+    
+    # Environment
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?MONGO_ROOT_PASSWORD obrigatoria - rode setup_production.sh}
+      MONGO_INITDB_DATABASE: ${MONGO_DBNAME:-crypto_trade_hub}
+      MONGODB_REPLICA_SET: rs0
+    
+    # Ports - ONLY expose to localhost for debugging
+    ports:
+      - "127.0.0.1:27017:27017"
+    
+    # Volumes
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    
+    # Networks
+    networks:
+      - backend_network
+    
+    # Health check
+    healthcheck:
+      test: |
+        mongosh -u ${MONGO_ROOT_USER:-admin} -p ${MONGO_ROOT_PASSWORD} --eval 'db.adminCommand("ping")'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    
+    # Command with replica set
+    command: 
+      - --replSet=rs0
+      - --bind_ip_all
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==================== REDIS ====================
+  redis:
+    image: redis:7-alpine
+    container_name: crypto-trade-redis
+    
+    # Ports - ONLY internal network
+    expose:
+      - 6379
+    ports:
+      - "127.0.0.1:6379:6379"
+    
+    # Volumes - PERSISTENT (RDB + AOF)
+    # This is CRITICAL for Lock State and Kill Switch state persistence
+    volumes:
+      - redis_data:/data
+      - ./redis.prod.conf:/usr/local/etc/redis/redis.conf:ro
+    
+    # Networks
+    networks:
+      - backend_network
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    
+    # Command with config file
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD obrigatoria - rode setup_production.sh}
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==================== BACKEND (FastAPI) ====================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: crypto-trade-backend
+    
+    # Environment Variables
+    environment:
+      # Database
+      MONGODB_URL: mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DBNAME:-crypto_trade_hub}?authSource=admin
+      DATABASE_URL: mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DBNAME:-crypto_trade_hub}?authSource=admin
+      MONGO_DBNAME: ${MONGO_DBNAME:-crypto_trade_hub}
+      
+      # Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      REDIS_CACHE_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+      
+      # FastAPI / App mode
+      APP_MODE: prod
+      ENVIRONMENT: production
+      DEBUG: "false"
+      
+      # JWT + Encryption (REQUIRED in prod — startup aborts if not set)
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY}
+      STRATEGY_ENCRYPTION_KEY: ${STRATEGY_ENCRYPTION_KEY}
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      REFRESH_TOKEN_EXPIRE_MINUTES: 10080
+      
+      # Google OAuth (REQUIRED for Google login)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
+      FRONTEND_REDIRECT_URI: ${FRONTEND_REDIRECT_URI}
+      
+      # CORS (REQUIRED — set your production domain)
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-[]}
+      
+      # SMTP — e-mail / OTP (optional but strongly recommended)
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@example.com}
+      
+      # Perfect Pay (required for payments)
+      PERFECT_PAY_API_KEY: ${PERFECT_PAY_API_KEY:-}
+      PERFECT_PAY_POSTBACK_SECRET: ${PERFECT_PAY_POSTBACK_SECRET:-}
+      PERFECT_PAY_PLAN_MAP: ${PERFECT_PAY_PLAN_MAP:-{}}
+      
+      # Monitoring
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      
+      # Logging
+      LOG_LEVEL: info
+    
+    # Ports - ONLY internal
+    expose:
+      - 8000
+    ports:
+      - "127.0.0.1:8000:8000"
+    
+    # Volumes (codigo ja esta dentro da imagem via Dockerfile.prod)
+    volumes:
+      - backend_logs:/var/log/crypto-trade
+    
+    # Networks
+    networks:
+      - backend_network
+    
+    # Dependencies
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ==================== NGINX (Reverse Proxy + Frontend) ====================
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: crypto-trade-nginx
+    
+    # Ports - THESE ARE PUBLIC
+    ports:
+      - "80:80"
+      - "443:443"
+    
+    # Volumes
+    volumes:
+      - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./dist:/usr/share/nginx/html:ro
+      - nginx_logs:/var/log/nginx
+    
+    # Networks
+    networks:
+      - backend_network
+    
+    # Dependencies
+    depends_on:
+      backend:
+        condition: service_healthy
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ==================== BOT ENGINE (DOC-09) ====================
+  engine:
+    build:
+      context: .
+      dockerfile: Dockerfile.engine
+    image: crypto-trade-hub-engine:${IMAGE_TAG:-latest}
+
+    # Environment Variables
+    environment:
+      MONGODB_URL: mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DBNAME:-crypto_trade_hub}?authSource=admin
+      MONGO_DBNAME: ${MONGO_DBNAME:-crypto_trade_hub}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      FERNET_KEY: ${ENCRYPTION_KEY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      APP_MODE: prod
+      ENVIRONMENT: production
+      KUCOIN_SANDBOX: ${KUCOIN_SANDBOX:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      MAX_BOTS_PER_ENGINE: ${MAX_BOTS_PER_ENGINE:-50}
+
+    # No public ports — engine only reads from Redis queue
+    networks:
+      - backend_network
+
+    # Dependencies
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Graceful shutdown: engine needs up to 60 s to close open positions
+    stop_grace_period: 90s
+
+    # Resource limits — each engine handles up to 50 bots
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+    # Security
+    security_opt:
+      - no-new-privileges:true
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ==================== PROMETHEUS (DOC-09) ====================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: crypto-trade-prometheus
+
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+
+    ports:
+      - "127.0.0.1:9090:9090"
+
+    networks:
+      - backend_network
+
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==================== GRAFANA (DOC-09) =======================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: crypto-trade-grafana
+
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?GRAFANA_PASSWORD obrigatoria - rode setup_production.sh}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/overview.json
+
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+    ports:
+      - "127.0.0.1:3000:3000"
+
+    networks:
+      - backend_network
+
+    depends_on:
+      - prometheus
+
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ==================== VOLUMES ====================
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  redis_data:
+    driver: local
+  backend_logs:
+    driver: local
+  nginx_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# ==================== NETWORKS ====================
+networks:
+  backend_network:
+    driver: bridge
+    # Isolated and secure - only containers in this network can communicate
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.bridge.name: "br-crypto"

@@ -1,0 +1,55 @@
+/* KuCoin Institutional Design Tokens */
+:root {
+  --bg: #0B0E11;
+  --card: #161A1E;
+  --primary: #23C882;
+  --success: #23C882; /* KuCoin green */
+  --danger: #FF4D4F;  /* neon red */
+  --warning: #F59E0B;
+  --error: #EF4444;
+  --text: #E6E8EC;
+  --muted: #848E9C;
+  --radius: 8px;
+  --transition: 200ms;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 12px;
+  border: none;
+  box-shadow: none;
+}
+
+.glass-card {
+  background: var(--card) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.btn-primary {
+  background: linear-gradient(90deg, var(--primary), #1BAF72);
+  color: var(--bg);
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: all var(--transition) ease;
+}
+
+.sparkline {
+  width: 100px;
+  height: 28px;
+}
+
+/* small helpers */
+.muted { color: var(--muted); }
+.text-success { color: var(--success); }
+.text-danger { color: var(--danger); }
+
+/* Glow helpers */
+.neon-up { box-shadow: 0 0 8px 2px rgba(35,200,130,0.18), 0 0 20px rgba(35,200,130,0.08); }
+.neon-down { box-shadow: 0 0 8px 2px rgba(255,77,79,0.18), 0 0 20px rgba(255,77,79,0.08); }

@@ -1,0 +1,77 @@
+# ============================================================
+# Crypto Trade Hub — Bot Engine Dockerfile
+# ============================================================
+# This image runs the standalone trading engine process.
+# It does NOT expose HTTP — it only reads from the Redis queue.
+#
+# Build:
+#   docker build -t crypto-trade-hub-engine:latest -f Dockerfile.engine .
+#
+# Run:
+#   docker run --env-file .env crypto-trade-hub-engine:latest
+# ============================================================
+
+# ── Stage 1: Builder (instala dependências C/Rust) ──────────
+FROM python:3.11-slim AS builder
+
+WORKDIR /tmp/build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    make \
+    libssl-dev \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY backend/requirements.txt .
+
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /tmp/wheels -r requirements.txt
+
+
+# ── Stage 2: Runtime (imagem mínima) ────────────────────────
+FROM python:3.11-slim
+
+WORKDIR /app
+
+LABEL maintainer="Crypto Trade Hub Team"
+LABEL description="Trading Engine — bot worker process"
+
+# Runtime-only system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install pre-built wheels from builder stage
+COPY --from=builder /tmp/wheels /tmp/wheels
+COPY backend/requirements.txt .
+RUN pip install --no-cache /tmp/wheels/* && rm -rf /tmp/wheels
+
+# Non-root user for security
+RUN useradd -m -u 1000 engineuser
+
+# Copy backend source code
+COPY backend /app
+
+# Adjust permissions
+RUN chown -R engineuser:engineuser /app
+
+USER engineuser
+
+# ── Environment defaults ─────────────────────────────────────
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    LOG_LEVEL=INFO \
+    MAX_BOTS_PER_ENGINE=50
+
+# ── Health check — engine writes a heartbeat key to Redis ───
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD python -c "\
+import asyncio, os, sys; \
+sys.path.insert(0, '/app'); \
+from app.shared.redis_client import get_redis; \
+redis = asyncio.run(get_redis()); \
+asyncio.run(redis.ping()) or sys.exit(1)"
+
+# ── Entry point ──────────────────────────────────────────────
+# Runs the engine as a module so relative imports work correctly.
+CMD ["python", "-m", "app.engine.main"]

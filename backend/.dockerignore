@@ -1,0 +1,120 @@
+# Docker ignore file for Crypto Trade Hub Backend
+# Excludes files not needed in the container
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+README*
+CHANGELOG*
+
+# Tests
+tests/
+test_*
+*_test.py
+conftest.py
+
+# Development files
+.env
+.env.local
+.env.development
+.env.test
+
+# Logs
+*.log
+logs/
+backend_stdout.log
+backend_stderr.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Node.js (if any frontend files are mixed)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Coverage reports
+.coverage
+.pytest_cache/
+htmlcov/
+.coverage.*
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Local development
+data/
+local_db.json
+inject_trade_runner.py
+reset_user_password.py
+create_db.py
+create_tables.py
+init_local_db.py
+run_server.py
+start_*.py
+launcher.py

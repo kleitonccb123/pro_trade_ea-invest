@@ -1,0 +1,197 @@
+# ===============================================
+# 🔥 Docker Compose para Stress Test
+# ===============================================
+#
+# Executa teste de stress contra o ambiente de produção real
+#
+# Uso:
+#   # Testar ambiente local
+#   docker-compose -f docker-compose.stress.yml up stress-local
+#
+#   # Testar ambiente de produção
+#   docker-compose -f docker-compose.stress.yml up stress-prod
+#
+#   # Locust com dashboard
+#   docker-compose -f docker-compose.stress.yml up locust
+#
+#   # Stack completa (backend + stress test)
+#   docker-compose -f docker-compose.stress.yml --profile full up
+#
+# ===============================================
+
+version: '3.8'
+
+services:
+  # ============================================
+  # Stress Test - Ambiente Local
+  # ============================================
+  stress-local:
+    build:
+      context: .
+      dockerfile: Dockerfile.stress
+    container_name: crypto-stress-local
+    command: ["--url", "http://host.docker.internal:8000", "--users", "50", "--bots", "100", "--duration", "60"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./stress_reports:/app/reports
+    networks:
+      - stress-network
+
+  # ============================================
+  # Stress Test - Quick (Teste Rápido)
+  # ============================================
+  stress-quick:
+    build:
+      context: .
+      dockerfile: Dockerfile.stress
+    container_name: crypto-stress-quick
+    command: ["--quick"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - stress-network
+
+  # ============================================
+  # Stress Test - Produção
+  # ============================================
+  stress-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile.stress
+    container_name: crypto-stress-prod
+    command: >
+      --url ${PROD_API_URL:-https://api.example.com}
+      --users ${STRESS_USERS:-100}
+      --bots ${STRESS_BOTS:-200}
+      --duration ${STRESS_DURATION:-120}
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./stress_reports:/app/reports
+    networks:
+      - stress-network
+
+  # ============================================
+  # Locust - Dashboard Web
+  # ============================================
+  locust:
+    build:
+      context: .
+      dockerfile: Dockerfile.stress
+    container_name: crypto-locust
+    command: ["--locust", "--host", "http://host.docker.internal:8000"]
+    ports:
+      - "8089:8089"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./stress_reports:/app/reports
+    networks:
+      - stress-network
+
+  # ============================================
+  # Locust - Headless (para CI/CD)
+  # ============================================
+  locust-ci:
+    build:
+      context: .
+      dockerfile: Dockerfile.stress
+    container_name: crypto-locust-ci
+    command: ["--locust-headless"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - USERS=${STRESS_USERS:-50}
+      - SPAWN_RATE=${STRESS_SPAWN_RATE:-5}
+      - RUN_TIME=${STRESS_DURATION:-60s}
+      - HOST=${PROD_API_URL:-http://host.docker.internal:8000}
+    volumes:
+      - ./stress_reports:/app
+    networks:
+      - stress-network
+
+  # ============================================
+  # Backend (opcional - para teste completo)
+  # ============================================
+  backend:
+    profiles:
+      - full
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: crypto-backend-test
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URL=${MONGODB_URL:-mongodb://mongo:27017}
+      - DATABASE_NAME=crypto_stress_test
+      - OFFLINE_MODE=true
+      - APP_MODE=development
+    depends_on:
+      - mongo
+    networks:
+      - stress-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # MongoDB (opcional - para teste completo)
+  # ============================================
+  mongo:
+    profiles:
+      - full
+    image: mongo:7.0
+    container_name: crypto-mongo-test
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_stress_data:/data/db
+    networks:
+      - stress-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Monitor de Recursos (opcional)
+  # ============================================
+  resource-monitor:
+    profiles:
+      - monitor
+    image: google/cadvisor:latest
+    container_name: crypto-cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - stress-network
+
+# ============================================
+# Networks
+# ============================================
+networks:
+  stress-network:
+    driver: bridge
+
+# ============================================
+# Volumes
+# ============================================
+volumes:
+  mongo_stress_data:

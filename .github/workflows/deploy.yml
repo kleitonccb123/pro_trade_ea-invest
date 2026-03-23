@@ -1,0 +1,521 @@
+# ===============================================
+# 🚀 CI/CD Pipeline - Crypto Trade Hub
+# ===============================================
+#
+# Este workflow automatiza:
+# 1. Testes unitários e validação
+# 2. Build das imagens Docker
+# 3. Push para GitHub Container Registry
+# 4. Deploy no servidor via SSH
+# 5. Notificação de status
+#
+# Secrets necessários (configure em Settings > Secrets):
+# - GHCR_TOKEN: Token com permissão write:packages
+# - SSH_HOST: IP ou hostname do servidor
+# - SSH_USER: Usuário SSH
+# - SSH_PRIVATE_KEY: Chave privada SSH
+# - SSH_PORT: Porta SSH (opcional, default 22)
+# - DEPLOY_PATH: Caminho no servidor onde está o projeto
+# - NOTIFICATION_WEBHOOK_URL: URL do webhook de notificação
+# - MONGODB_URL: URL do MongoDB em produção
+# - ENCRYPTION_KEY: Chave Fernet para criptografia
+#
+# ===============================================
+
+name: 🚀 Deploy Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Pular testes (emergência)'
+        required: false
+        default: 'false'
+      deploy_env:
+        description: 'Ambiente de deploy'
+        required: false
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_BACKEND: ${{ github.repository }}/backend
+  IMAGE_NAME_FRONTEND: ${{ github.repository }}/frontend
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ============================================
+  # 🧪 JOB 1: Testes e Validação
+  # ============================================
+  test:
+    name: 🧪 Testes e Validação
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.skip_tests != 'true' }}
+    
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: 'backend/requirements.txt'
+
+      - name: 📦 Instalar dependências Python
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov httpx
+
+      - name: 🔍 Verificar arquivos de configuração
+        run: |
+          echo "📋 Verificando arquivos necessários..."
+          
+          # Verificar se .env.example existe
+          if [ ! -f "backend/.env.example" ]; then
+            echo "❌ backend/.env.example não encontrado!"
+            exit 1
+          fi
+          echo "✅ backend/.env.example encontrado"
+          
+          # Verificar variáveis críticas no .env.example
+          REQUIRED_VARS=("MONGODB_URL" "ENCRYPTION_KEY" "JWT_SECRET_KEY")
+          for var in "${REQUIRED_VARS[@]}"; do
+            if ! grep -q "$var" backend/.env.example; then
+              echo "⚠️ Variável $var não documentada em .env.example"
+            else
+              echo "✅ $var documentada"
+            fi
+          done
+
+      - name: 🧪 Executar testes unitários Backend
+        env:
+          MONGODB_URL: mongodb://localhost:27017
+          DATABASE_NAME: test_crypto_trade_hub
+          OFFLINE_MODE: "true"
+          APP_MODE: "test"
+          JWT_SECRET_KEY: "test-secret-key-for-ci"
+        run: |
+          cd backend
+          python -m pytest tests/ -v --tb=short --cov=app --cov-report=xml --cov-report=term-missing
+
+      - name: 🔍 Lint Python (Ruff)
+        run: |
+          pip install ruff
+          cd backend
+          ruff check app/ --output-format=github
+
+      - name: 📊 Upload cobertura
+        uses: codecov/codecov-action@v4
+        continue-on-error: true
+        with:
+          files: backend/coverage.xml
+          flags: backend
+          fail_ci_if_error: false
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Instalar dependências Frontend
+        run: npm ci
+
+      - name: 🔍 Lint Frontend
+        run: npm run lint
+
+      - name: 🧪 Testes Frontend
+        run: npx vitest run --reporter=verbose
+
+      - name: 🏗️ Build Frontend (validação)
+        run: npm run build
+
+      - name: ✅ Testes concluídos
+        run: echo "🎉 Todos os testes passaram!"
+
+  # ============================================
+  # 🐳 JOB 2: Build das Imagens Docker
+  # ============================================
+  build:
+    name: 🐳 Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      backend_image: ${{ steps.meta-backend.outputs.tags }}
+      frontend_image: ${{ steps.meta-frontend.outputs.tags }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 🏷️ Gerar versão
+        id: version
+        run: |
+          VERSION=$(date +'%Y%m%d')-$(echo ${{ github.sha }} | cut -c1-7)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Versão: $VERSION"
+
+      - name: 🐳 Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔐 Login no GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ---- Backend ----
+      - name: 📝 Metadados Backend
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=sha,prefix=
+
+      - name: 🏗️ Build & Push Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ steps.version.outputs.version }}
+
+      # ---- Frontend ----
+      - name: 📝 Metadados Frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=sha,prefix=
+
+      - name: 🏗️ Build & Push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VITE_API_URL=/api
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+
+      - name: 📋 Resumo do Build
+        run: |
+          echo "## 🐳 Imagens Construídas" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Componente | Imagem |" >> $GITHUB_STEP_SUMMARY
+          echo "|------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend | \`${{ steps.meta-backend.outputs.tags }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | \`${{ steps.meta-frontend.outputs.tags }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📦 Versão: \`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================
+  # 🚀 JOB 3a: Deploy em Staging
+  # ============================================
+  deploy-staging:
+    name: 🧪 Deploy em Staging
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    environment:
+      name: staging
+      url: https://staging.${{ vars.DOMAIN_URL || 'seu-dominio.com' }}
+
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 🔐 Configurar SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: 📝 Adicionar host conhecido
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.SSH_PORT || 22 }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: 🧪 Deploy em Staging
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
+          DEPLOY_PATH: ${{ secrets.STAGING_DEPLOY_PATH || secrets.DEPLOY_PATH }}
+          IMAGE_BACKEND: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:${{ needs.build.outputs.version }}
+          IMAGE_FRONTEND: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ needs.build.outputs.version }}
+        run: |
+          echo "🧪 Iniciando deploy em STAGING..."
+
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST << 'ENDSSH'
+            set -e
+            cd $DEPLOY_PATH
+
+            echo "🔐 Login no registry..."
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            echo "📥 Baixando imagens..."
+            docker pull $IMAGE_BACKEND
+            docker pull $IMAGE_FRONTEND
+
+            echo "🔄 Recriando containers (staging)..."
+            docker-compose -f docker-compose.staging.yml down --remove-orphans || true
+            docker-compose -f docker-compose.staging.yml up -d
+
+            echo "🏥 Health check..."
+            sleep 10
+            curl -sf http://localhost:8000/health || echo "⚠️ Health check falhou"
+
+            echo "✅ Staging deploy concluído!"
+          ENDSSH
+
+      - name: 📋 Resumo Staging
+        run: |
+          echo "## 🧪 Deploy Staging Realizado" >> $GITHUB_STEP_SUMMARY
+          echo "📦 Versão: \`${{ needs.build.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================
+  # 🚀 JOB 3b: Deploy em Produção (requer aprovação manual)
+  # ============================================
+  deploy:
+    name: 🚀 Deploy em Produção
+    runs-on: ubuntu-latest
+    needs: [build, deploy-staging]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    environment:
+      name: production
+      url: https://${{ vars.DOMAIN_URL || 'seu-dominio.com' }}
+
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 🔐 Configurar SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: 📝 Adicionar host conhecido
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.SSH_PORT || 22 }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: 🚀 Deploy via SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          VERSION: ${{ needs.build.outputs.version }}
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_BACKEND: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:latest
+          IMAGE_FRONTEND: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:latest
+        run: |
+          echo "🚀 Iniciando deploy no servidor..."
+          
+          ssh -p $SSH_PORT $SSH_USER@$SSH_HOST << 'ENDSSH'
+            set -e
+            
+            echo "📂 Navegando para $DEPLOY_PATH"
+            cd $DEPLOY_PATH
+            
+            echo "🔄 Atualizando código..."
+            git pull origin main || true
+            
+            echo "🔐 Login no registry..."
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            echo "📥 Baixando novas imagens..."
+            docker pull $IMAGE_BACKEND
+            docker pull $IMAGE_FRONTEND
+            
+            echo "🔄 Recriando containers..."
+            docker-compose down --remove-orphans || true
+            docker-compose up -d
+            
+            echo "🧹 Limpando imagens antigas..."
+            docker image prune -f
+            
+            echo "✅ Deploy concluído!"
+            
+            # Health check
+            echo "🏥 Verificando saúde do sistema..."
+            sleep 10
+            curl -sf http://localhost:8000/health || echo "⚠️ Health check falhou"
+          ENDSSH
+
+      - name: 📋 Resumo do Deploy
+        run: |
+          echo "## 🚀 Deploy Realizado" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Info | Valor |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Versão | \`${{ needs.build.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ambiente | Production |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Autor | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================
+  # 📢 JOB 4: Notificação
+  # ============================================
+  notify:
+    name: 📢 Notificação
+    runs-on: ubuntu-latest
+    needs: [test, build, deploy-staging, deploy]
+    if: always()
+
+    steps:
+      - name: 📊 Determinar status
+        id: status
+        run: |
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "emoji=✅" >> $GITHUB_OUTPUT
+            echo "message=Deploy realizado com sucesso!" >> $GITHUB_OUTPUT
+            echo "color=good" >> $GITHUB_OUTPUT
+          elif [ "${{ needs.deploy.result }}" == "skipped" ]; then
+            echo "status=skipped" >> $GITHUB_OUTPUT
+            echo "emoji=⏭️" >> $GITHUB_OUTPUT
+            echo "message=Deploy ignorado (não é branch main)" >> $GITHUB_OUTPUT
+            echo "color=warning" >> $GITHUB_OUTPUT
+          elif [ "${{ needs.build.result }}" == "failure" ]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "emoji=❌" >> $GITHUB_OUTPUT
+            echo "message=Falha no build das imagens Docker" >> $GITHUB_OUTPUT
+            echo "color=danger" >> $GITHUB_OUTPUT
+          elif [ "${{ needs.test.result }}" == "failure" ]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "emoji=🧪" >> $GITHUB_OUTPUT
+            echo "message=Falha nos testes" >> $GITHUB_OUTPUT
+            echo "color=danger" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "emoji=❌" >> $GITHUB_OUTPUT
+            echo "message=Deploy falhou" >> $GITHUB_OUTPUT
+            echo "color=danger" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📢 Enviar notificação via Webhook
+        if: ${{ secrets.NOTIFICATION_WEBHOOK_URL != '' }}
+        continue-on-error: true
+        run: |
+          curl -X POST "${{ secrets.NOTIFICATION_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "type": "deploy",
+              "status": "${{ steps.status.outputs.status }}",
+              "title": "${{ steps.status.outputs.emoji }} CI/CD Pipeline",
+              "message": "${{ steps.status.outputs.message }}",
+              "details": {
+                "repository": "${{ github.repository }}",
+                "branch": "${{ github.ref_name }}",
+                "commit": "${{ github.sha }}",
+                "author": "${{ github.actor }}",
+                "workflow_run": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                "timestamp": "${{ github.event.head_commit.timestamp }}"
+              }
+            }'
+
+      - name: 📋 Resumo Final
+        run: |
+          echo "## ${{ steps.status.outputs.emoji }} Pipeline Finalizado" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ steps.status.outputs.message }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Resultados dos Jobs" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Testes | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Staging | ${{ needs.deploy-staging.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Produção | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================
+  # 🔥 JOB 5: Stress Test (opcional, manual)
+  # ============================================
+  stress-test:
+    name: 🔥 Stress Test
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_env == 'staging'
+
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 📦 Instalar dependências
+        run: |
+          pip install -r tests/requirements-stress.txt
+
+      - name: 🔥 Executar Stress Test
+        env:
+          TARGET_URL: ${{ vars.STAGING_URL || 'http://localhost:8000' }}
+        run: |
+          python tests/stress_test.py \
+            --url $TARGET_URL \
+            --users 20 \
+            --bots 50 \
+            --duration 60
+
+      - name: 📊 Upload relatório
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-test-report
+          path: stress_reports/
+          retention-days: 7

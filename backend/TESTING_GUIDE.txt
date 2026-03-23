@@ -1,0 +1,317 @@
+"""
+Testing Guide - FASE 3 Services & Fixtures
+===========================================
+
+This document explains how to run tests for the database services.
+
+Files:
+------
+- test_fixtures.py: Global test data fixtures (bots, orders, positions)
+- test_bot_service.py: Unit tests for BotService
+- test_order_service.py: Unit tests for OrderService
+- test_position_service.py: Unit tests for PositionService
+- conftest.py: Pytest configuration and fixture discovery
+
+Running Tests
+=============
+
+1. Install test dependencies:
+   pip install pytest pytest-asyncio pytest-mock
+
+2. Run all tests:
+   pytest backend/ -v
+
+3. Run specific test file:
+   pytest backend/test_bot_service.py -v
+
+4. Run specific test class:
+   pytest backend/test_bot_service.py::TestBotServiceCreate -v
+
+5. Run with coverage:
+   pytest backend/ --cov=app/db --cov-report=html
+
+6. Run tests matching pattern:
+   pytest backend/ -k "test_create" -v
+
+7. Run async tests only:
+   pytest backend/ -m asyncio -v
+
+Test Coverage
+=============
+
+BotService Tests (test_bot_service.py):
+✓ Creation (basic, with config)
+✓ Retrieval (get_bot, list_bots, list with filters)
+✓ Updates (status, statistics, config)
+✓ Deletion (success, fails if running)
+✓ Ownership validation
+✓ Full lifecycle test
+
+OrderService Tests (test_order_service.py):
+✓ Creation (basic, with client_oid generation)
+✓ Validation & Execution (RiskManager + OrderManager integration)
+✓ Retrieval (get_order, list_orders, filtering)
+✓ Cancellation (success, fails if already filled)
+✓ Execution recording (single fill, multiple fills)
+✓ Ownership validation
+✓ Error handling
+
+PositionService Tests (test_position_service.py):
+✓ Opening positions (long, short)
+✓ Retrieval (get_position, list_open_positions)
+✓ PnL calculation (profitable, losing, short, stop loss)
+✓ Closing positions (with profit, with loss)
+✓ Portfolio summary (single, multiple, no positions)
+✓ Ownership validation
+✓ Full lifecycle test
+
+Total Test Cases: 60+
+
+Fixtures
+========
+
+Bot Fixtures:
+- sample_bot_data: Dict with minimal bot data
+- sample_bot: Bot instance in STOPPED state
+- sample_running_bot: Bot instance in RUNNING state
+- sample_bot_with_stats: Bot with trading statistics
+
+Order Fixtures:
+- sample_order_data: Dict with minimal order data
+- sample_order: Order instance in PENDING state
+- sample_open_order: Order executed on exchange
+- sample_filled_order: Order completely filled
+- sample_partially_filled_order: Order 50% filled
+- sample_rejected_order: Order rejected by validation
+
+Position Fixtures:
+- sample_position_data: Dict with minimal position data
+- sample_position: Position at break-even
+- sample_profitable_position: Position with $300 profit
+- sample_losing_position: Position with $300 loss
+- sample_closed_position: Closed position with realized PnL
+- sample_short_position: Short position (sell-first)
+
+Trade Fixtures:
+- sample_trade_data: Dict with minimal trade data
+- sample_trade: Trade instance
+
+Mock Fixtures:
+- mock_bots_collection: Mock MongoDB bots collection
+- mock_orders_collection: Mock MongoDB orders collection
+- mock_positions_collection: Mock MongoDB positions collection
+- mock_trades_collection: Mock MongoDB trades collection
+
+Scenario Fixtures:
+- sample_multi_order_scenario: Dict with multiple orders for testing
+
+Using Fixtures in Tests
+=======================
+
+Example 1: Test with fixture:
+
+    @pytest.mark.asyncio
+    async def test_my_test(self, sample_bot, mock_bots_collection):
+        \"\"\"Test using fixtures.\"\"\"
+        service = BotService(mock_bots_collection)
+        # ... test code ...
+
+Example 2: Customize fixture data:
+
+    @pytest.mark.asyncio
+    async def test_custom_bot(self, sample_bot_data):
+        \"\"\"Test with modified fixture data.\"\"\"
+        sample_bot_data["name"] = "My Custom Bot"
+        bot = Bot(**sample_bot_data)
+        assert bot.name == "My Custom Bot"
+
+Example 3: Multiple fixtures:
+
+    @pytest.mark.asyncio
+    async def test_order_workflow(
+        self,
+        sample_bot,
+        sample_order,
+        sample_position,
+        mock_bots_collection,
+        mock_orders_collection,
+        mock_positions_collection
+    ):
+        \"\"\"Test with multiple fixtures.\"\"\"
+        # ... test code using all fixtures ...
+
+Test Markers
+============
+
+Mark tests with pytest markers:
+
+    @pytest.mark.unit
+    async def test_something():
+        pass
+
+    @pytest.mark.integration
+    async def test_something():
+        pass
+
+    @pytest.mark.asyncio
+    async def test_something():
+        pass
+
+Run tests with specific markers:
+
+    pytest backend/ -m unit -v          # Only unit tests
+    pytest backend/ -m integration -v   # Only integration tests
+    pytest backend/ -m asyncio -v       # Only async tests
+
+Test Output Examples
+====================
+
+Success:
+    test_bot_service.py::TestBotServiceCreate::test_create_bot_basic PASSED
+
+Failure:
+    test_bot_service.py::TestBotServiceCreate::test_bad_test FAILED
+    AssertionError: assert False is True
+
+Skipped:
+    test_bot_service.py::TestBotServiceCreate::skip_test SKIPPED
+
+Coverage Report:
+    backend/app/db/bot_service.py      100%    (50 statements)
+    backend/app/db/order_service.py    100%    (85 statements)
+    backend/app/db/position_service.py 100%    (60 statements)
+    ========== 60+ tests passed in 5.23s ==========
+
+Debugging Tests
+===============
+
+Print debug info in tests:
+
+    @pytest.mark.asyncio
+    async def test_something(self, sample_bot):
+        print(f"Bot: {sample_bot}")
+        assert sample_bot is not None
+
+Run with print output:
+
+    pytest backend/ -v -s  # Show print statements
+
+Run with detailed assertion info:
+
+    pytest backend/ -vv  # More verbose
+
+Use pdb debugger:
+
+    import pdb
+    
+    @pytest.mark.asyncio
+    async def test_something():
+        pdb.set_trace()  # Stops execution here
+        # Use 'c' to continue, 'n' for next line, etc.
+
+CI/CD Integration
+=================
+
+Add to GitHub Actions (.github/workflows/tests.yml):
+
+    name: Tests
+    on: [push, pull_request]
+    jobs:
+      test:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v2
+          - uses: actions/setup-python@v2
+            with:
+              python-version: '3.9'
+          - run: pip install -r requirements-test.txt
+          - run: pytest backend/ --cov=app/db
+
+Add to pre-commit hook (.git/hooks/pre-commit):
+
+    #!/bin/bash
+    pytest backend/ --quiet || exit 1
+
+Best Practices
+==============
+
+1. Test one thing per test:
+   ✓ test_create_bot_basic
+   ✗ test_create_and_update_and_delete_bot
+
+2. Use descriptive test names:
+   ✓ test_update_bot_config_blocked_when_running
+   ✗ test_update_config
+
+3. Test both success and failure paths:
+   ✓ test_delete_bot_success + test_delete_bot_fails_if_running
+   ✗ only test_delete_bot
+
+4. Use fixtures for reusable data:
+   ✓ Use sample_bot_data fixture
+   ✗ Create new data in every test
+
+5. Mock external dependencies:
+   ✓ Mock MongoDB collections
+   ✗ Use real database in tests
+
+6. Test ownership validation:
+   ✓ Verify user_id filters in queries
+   ✗ Skip ownership tests
+
+7. Test error cases:
+   ✓ Test invalid input, missing data, permission errors
+   ✗ Only test happy path
+
+Troubleshooting
+===============
+
+Issue: \"No module named 'pytest'\"
+Solution: pip install pytest pytest-asyncio
+
+Issue: \"RuntimeError: Event loop is closed\"
+Solution: Ensure async tests use @pytest.mark.asyncio
+
+Issue: \"AssertionError: assert None is not None\"
+Solution: Check mock setup - verify mocks are configured before test runs
+
+Issue: \"Tests pass locally but fail in CI\"
+Solution: Check Python version, dependencies, environment variables
+
+Issue: \"Test hangs indefinitely\"
+Solution: Add timeout: pytest backend/ --timeout=60
+
+Running Full Test Suite
+=======================
+
+1. Install dependencies:
+   pip install -r requirements-test.txt
+
+2. Run all tests with coverage:
+   pytest backend/ \\
+     --cov=app/db \\
+     --cov-report=html \\
+     --cov-report=term-missing \\
+     -v
+
+3. Check coverage report:
+   open htmlcov/index.html  # macOS
+   start htmlcov/index.html # Windows
+   xdg-open htmlcov/index.html # Linux
+
+4. Run linters:
+   flake8 backend/app/db/
+   black backend/app/db/ --check
+   isort backend/app/db/ --check
+
+Next Steps
+==========
+
+After running tests successfully:
+
+1. Implement router integration (connect services to HTTP endpoints)
+2. Add JWT authentication
+3. Run integration tests with real MongoDB
+4. Add load/stress tests
+5. Set up CI/CD pipeline
+"""

@@ -1,0 +1,61 @@
+# ===============================================
+# 🔥 Dockerfile para Stress Test
+# ===============================================
+# 
+# Build:
+#   docker build -f Dockerfile.stress -t crypto-stress-test .
+#
+# Run (teste local):
+#   docker run --rm --network host crypto-stress-test --url http://localhost:8000 --quick
+#
+# Run (teste produção):
+#   docker run --rm crypto-stress-test --url https://api.seudominio.com --users 50 --bots 100 --duration 120
+#
+# ===============================================
+
+FROM python:3.11-slim
+
+# Metadados
+LABEL maintainer="Crypto Trade Hub"
+LABEL description="Stress Test Suite para Crypto Trade Hub"
+LABEL version="1.0"
+
+# Variáveis de ambiente
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Diretório de trabalho
+WORKDIR /app
+
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar requirements de teste
+COPY tests/requirements-stress.txt requirements.txt
+
+# Instalar dependências Python
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copiar scripts de teste
+COPY tests/stress_test.py .
+COPY tests/locustfile.py .
+
+# Script de entrada
+COPY tests/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# Portas (para Locust web UI)
+EXPOSE 8089
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8089/ || exit 0
+
+# Entrypoint
+ENTRYPOINT ["/docker-entrypoint.sh"]
+
+# Comando padrão (pode ser sobrescrito)
+CMD ["--help"]

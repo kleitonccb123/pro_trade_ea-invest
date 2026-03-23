@@ -1,0 +1,71 @@
+# ============================================================
+# Prometheus Configuration — Crypto Trade Hub
+# ============================================================
+# Collects metrics from:
+#   - FastAPI backend (/metrics via prometheus-client)
+#   - Redis (via redis_exporter sidecar if deployed)
+#   - MongoDB (via mongodb_exporter sidecar if deployed)
+#
+# Usage:
+#   docker run -v $(pwd)/prometheus.yml:/etc/prometheus/prometheus.yml \
+#              prom/prometheus:latest
+# ============================================================
+
+global:
+  scrape_interval:     15s   # Pull metrics every 15 seconds
+  evaluation_interval: 15s   # Evaluate alerting rules every 15 seconds
+  scrape_timeout:      10s
+
+  # Labels added to all time-series scraped by this Prometheus
+  external_labels:
+    environment: "production"
+    project:     "crypto-trade-hub"
+
+# ── Alerting rules ────────────────────────────────────────────
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []  # Configure Alertmanager host:port here if used
+
+# ── Rule files ────────────────────────────────────────────────
+rule_files:
+  # - "alerts/bot_alerts.yml"
+
+# ── Scrape configs ────────────────────────────────────────────
+scrape_configs:
+
+  # Prometheus self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # FastAPI backend — exposes /metrics via prometheus-fastapi-instrumentator
+  # In Docker Compose the service is named "backend" (or "api")
+  - job_name: "crypto-backend"
+    metrics_path: /metrics
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["backend:8000"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # Bot Engine process (if it exposes metrics; disabled by default)
+  # - job_name: "crypto-engine"
+  #   static_configs:
+  #     - targets: ["engine:9100"]
+
+  # Redis Exporter (add redis_exporter sidecar to docker-compose to enable)
+  # - job_name: "redis"
+  #   static_configs:
+  #     - targets: ["redis-exporter:9121"]
+
+  # MongoDB Exporter (add mongodb_exporter sidecar to docker-compose to enable)
+  # - job_name: "mongodb"
+  #   static_configs:
+  #     - targets: ["mongo-exporter:9216"]
+
+  # Node Exporter (host-level CPU/RAM/disk — deploy separately)
+  # - job_name: "node"
+  #   static_configs:
+  #     - targets: ["node-exporter:9100"]

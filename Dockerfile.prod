@@ -1,0 +1,81 @@
+# Multi-stage Dockerfile para Backend FastAPI em Produção
+# Reduz tamanho da imagem: ~200MB builder -> ~100MB final
+# Remove compiladores C, pip cache e dependências de build
+
+FROM python:3.11-slim as builder
+
+# ==================== STAGE 1: BUILDER ====================
+# Instala dependências de build (gcc, etc) APENAS aqui
+# Resultado: apenas os wheel files são copiados
+
+WORKDIR /tmp/build
+
+# Instalar dependências de build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    make \
+    libssl-dev \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar requirements.txt
+COPY backend/requirements.txt .
+
+# Compilar wheels (binários Python otimizados)
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /tmp/wheels -r requirements.txt
+
+
+# ==================== STAGE 2: RUNTIME ====================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Labels para metadados
+LABEL maintainer="Crypto Trade Hub Team"
+LABEL version="1.0.0"
+LABEL description="FastAPI Backend for Crypto Trade Hub with Activation Credits System"
+
+# Instalar apenas dependências de runtime (sem compiladores)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar wheels compilados do builder
+COPY --from=builder /tmp/wheels /tmp/wheels
+
+# Copiar requirements.txt
+COPY backend/requirements.txt .
+
+# Instalar wheels pré-compilados (RÁPIDO)
+RUN pip install --no-cache /tmp/wheels/* && \
+    rm -rf /tmp/wheels
+
+# Criar usuário não-root para segurança
+RUN useradd -m -u 1000 appuser
+
+# Copiar código da aplicação
+COPY backend /app
+
+# Ajustar permissões
+RUN chown -R appuser:appuser /app
+
+# Mudar para usuário não-root
+USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Port
+EXPOSE 8000
+
+# Entrypoint: Gunicorn + Uvicorn workers
+CMD ["gunicorn", \
+     "--workers", "4", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--bind", "0.0.0.0:8000", \
+     "--timeout", "120", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-", \
+     "--log-level", "info", \
+     "app.main:app"]

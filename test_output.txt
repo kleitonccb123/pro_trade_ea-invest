@@ -1,0 +1,228 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main
+configfile: pytest.ini
+plugins: anyio-4.12.1, locust-2.43.2, asyncio-1.3.0, mock-3.15.1
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success PASSED [100%]
+
+============================== warnings summary ===============================
+backend\app\core\config.py:31
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\core\config.py:31: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class Settings(BaseSettings):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\bots\model.py:58: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    created_at: datetime = datetime.utcnow()
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\bots\model.py:59: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    last_updated: datetime = datetime.utcnow()
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\bots\model.py:100: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    created_at: datetime = datetime.utcnow()
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\bots\model.py:101: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    updated_at: datetime = datetime.utcnow()
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\notifications\schemas.py:33: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class NotificationOut(NotificationBase):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\notifications\schemas.py:96: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class NotificationPreferenceOut(NotificationPreferenceBase):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\notifications\schemas.py:149: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class PriceAlertOut(PriceAlertBase):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\strategies\models.py:22: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'example'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    name: str = Field(..., example="Cruzamento de M?dias M?veis")
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\strategies\models.py:24: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'example'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    parameters: Dict[str, Any] = Field(..., example={"short_period": 9, "long_period": 21})
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\.venv\Lib\site-packages\pydantic\_internal\_generate_schema.py:942: PydanticDeprecatedSince20: `__get_validators__` is deprecated and will be removed, use `__get_pydantic_core_schema__` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    warnings.warn(
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\affiliates\models.py:46: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class WithdrawalMethod(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\affiliates\models.py:58: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class AffiliateWallet(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\affiliates\models.py:118: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class AffiliateTransaction(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\affiliates\models.py:185: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class WithdrawRequest(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\router.py:54: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class GameProfileResponse(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\router.py:75: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class DailyChestRewardResponse(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\router.py:94: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class RobotRankingItem(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\router.py:115: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class RobotRankingResponse(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\router.py:125: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class RobotByPeriodItem(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\router.py:146: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class RobotRankingByPeriodResponse(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\router.py:158: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class UnlockRobotResponse(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\router.py:168: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class LeaderboardItemResponse(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\router.py:181: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class LeaderboardResponse(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\router.py:193: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class PointBundleItem(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\router.py:207: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class StoreBundlesResponse(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\router.py:224: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class PurchasePointsResponse(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\router.py:1412: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class TradingLeaderboardEntry(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\router.py:1430: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class TradingLeaderboardResponse(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\routers\exchanges.py:26: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class ExchangeCredentialRequest(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\.venv\Lib\site-packages\pydantic\_internal\_config.py:383: UserWarning: Valid config keys have changed in V2:
+  * 'schema_extra' has been renamed to 'json_schema_extra'
+    warnings.warn(message, UserWarning)
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\routers\bots.py:40: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class BotResponse(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\routers\orders.py:31: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class OrderPlaceRequest(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\routers\billing.py:115: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class PerfectPayPostback(BaseModel):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\.venv\Lib\site-packages\prometheus_fastapi_instrumentator\instrumentation.py:327: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    if asyncio.iscoroutinefunction(func):
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\main.py:410: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\.venv\Lib\site-packages\fastapi\applications.py:4576: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\main.py:842: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("shutdown")
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\strategies\pricepro_ea\router.py:41: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'example'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    symbol: str = Field(..., example="BTC-USDT", description="Par de negociaþÒo ex: BTC-USDT")
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\auth\router.py:248: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "created_at": datetime.utcnow(),
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\auth\router.py:249: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "updated_at": datetime.utcnow(),
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\service.py:94: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+    "id": str(existing_profile.get("_id")),
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\service.py:103: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "created_at": existing_profile.get("created_at", datetime.utcnow()),
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\gamification\service.py:104: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "updated_at": existing_profile.get("updated_at", datetime.utcnow()),
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\.venv\Lib\site-packages\pydantic\main.py:250: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\auth\router.py:258: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+    await GameProfileService.get_or_create_profile(user_id_str)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+backend/tests/integration/test_auth_endpoints.py::TestRegisterEndpoint::test_register_success
+  C:\Users\CLIENTE\Downloads\crypto-trade-hub-main\crypto-trade-hub-main\backend\app\auth\service.py:14: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return datetime.utcnow()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 1 passed, 53 warnings in 4.76s ========================

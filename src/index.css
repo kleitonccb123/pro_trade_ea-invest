@@ -1,0 +1,635 @@
+/* Pro Trader-EA - Premium Dark Trading Theme */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ── KuCoin Institutional Dark Theme ── */
+
+    /* ── Superfícies (tokens: surface.*) ── */
+    /* surface.base    #0B0E11 */ --background:          220 24% 6%;
+    /* surface.raised  #161A1E */ --card:                214 14% 10%;
+    --card-foreground:           220 15% 91%;
+    /* surface.overlay #1C2127 */ --popover:             218 17% 13%;
+    --popover-foreground:        220 15% 91%;
+
+    /* ── Texto (tokens: content.*) ── */
+    /* text.primary  #E6E8EC */   --foreground:          220 15% 91%;
+    /* text.secondary #848E9C */  --muted-foreground:    216 11% 57%;
+
+    /* ── Brand (tokens: brand.primary #23C882) — KuCoin Green ── */
+    --primary:                   155 70% 46%;
+    --primary-foreground:        220 24% 6%;
+
+    /* ── Secondary (surface.active #2A303A) ── */
+    --secondary:                 218 16% 20%;
+    --secondary-foreground:      220 15% 91%;
+
+    /* ── Muted (surface.hover #222830) ── */
+    --muted:                     220 17% 16%;
+
+    /* ── Accent (brand.alt #1BAF72) ── */
+    --accent:                    155 70% 40%;
+    --accent-foreground:         220 15% 91%;
+
+    /* ── Semânticos ── */
+    /* semantic.loss    #EF4444 */ --destructive:         0 84% 60%;
+    --destructive-foreground:    220 15% 91%;
+    /* semantic.profit  #23C882 */ --success:             155 70% 46%;
+    --success-foreground:        220 24% 6%;
+    /* semantic.warning #F59E0B */ --warning:             38 92% 50%;
+    --warning-foreground:        220 24% 6%;
+
+    /* ── Bordas e inputs (tokens: edge.*) ── */
+    /* border.subtle  #252932 */  --border:              222 13% 18%;
+    /* border.default #2E333F */  --input:               221 15% 22%;
+    /* brand.primary  #23C882 */  --ring:                155 70% 46%;
+
+    /* ── Radius global ── */
+    --radius: 0.5rem;
+
+    /* ── Sidebar ── */
+    /* surface.base  #0B0E11 */   --sidebar-background:        220 24% 6%;
+    /* text.secondary #848E9C */  --sidebar-foreground:        216 11% 57%;
+    /* brand.primary #23C882 */   --sidebar-primary:           155 70% 46%;
+    --sidebar-primary-foreground: 220 24% 6%;
+    /* surface.hover #222830 */   --sidebar-accent:            220 17% 16%;
+    --sidebar-accent-foreground:  220 15% 91%;
+    /* border.subtle #252932 */   --sidebar-border:            222 13% 18%;
+    --sidebar-ring:               155 70% 46%;
+
+    /* ── Chart (dados de gráfico) ── */
+    /* semantic.profit  #23C882 */ --chart-bullish:      155 70% 46%;
+    /* semantic.loss    #EF4444 */ --chart-bearish:      0 84% 60%;
+    /* semantic.neutral #848E9C */ --chart-neutral:      216 11% 57%;
+    /* brand.primary    #23C882 */ --chart-line:         155 70% 46%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    /* Gradiente sutil — apenas no brand.primary KuCoin green */
+    background-image:
+      radial-gradient(ellipse at 5% 80%, hsl(var(--primary) / 0.05) 0%, transparent 45%);
+    background-attachment: fixed;
+  }
+  
+  /* Premium titles */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    letter-spacing: -0.025em;
+  }
+  
+  /* Premium scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted/60 rounded-full;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary/40;
+  }
+  
+  /* Selection color */
+  ::selection {
+    background: hsl(var(--primary) / 0.3);
+    color: hsl(var(--foreground));
+  }
+
+  /* ── Dado financeiro — aplicar em qualquer número de trading ── */
+  .financial-value {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-variant-numeric: tabular-nums slashed-zero;
+    font-feature-settings: 'tnum', 'ss01';
+    letter-spacing: -0.025em;
+  }
+
+  /* ── Regra global: tabular-nums em seletores comuns de trading ── */
+  /* Garante alinhamento de colunas mesmo sem .financial-value explícito */
+  [class*="price"],
+  [class*="amount"],
+  [class*="balance"],
+  [class*="pnl"],
+  [class*="profit"],
+  td[class*="value"] {
+    font-variant-numeric: tabular-nums slashed-zero;
+  }
+
+  /* ── Base tipográfica — hierarquia de fonte por elemento ── */
+  h1, h2 {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  h3, h4 {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  /* ── Skeleton pulse suave (substitui o padrão do Tailwind) ── */
+  @keyframes subtle-pulse {
+    0%, 100% { opacity: 0.55; }
+    50%       { opacity: 0.85; }
+  }
+  .animate-pulse {
+    animation: subtle-pulse 2s ease-in-out infinite;
+  }
+
+  /* ── RetroGrid keyframes ── */
+  @keyframes grid {
+    0%   { transform: translateY(-50%); }
+    100% { transform: translateY(0); }
+  }
+  @keyframes grid-fade {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.55; }
+  }
+}
+
+@layer components {
+  /* Premium glass card effect */
+  .glass-card {
+    @apply bg-card/70 backdrop-blur-2xl border border-border/20 rounded-2xl;
+    box-shadow: 
+      0 0 0 1px hsl(var(--border) / 0.08),
+      0 8px 32px -8px hsl(225 50% 0% / 0.5),
+      0 4px 16px -4px hsl(225 50% 0% / 0.3),
+      inset 0 1px 0 0 hsl(210 40% 98% / 0.06);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .glass-card:hover {
+    border-color: hsl(var(--border) / 0.4);
+    box-shadow:
+      0 0 0 1px hsl(var(--border) / 0.15),
+      0 8px 32px -8px hsl(217 54% 0% / 0.55),
+      0 4px 16px -4px hsl(217 54% 0% / 0.35),
+      inset 0 1px 0 0 hsl(214 32% 96% / 0.05);
+  }
+  
+  /* Glow — uso restrito: apenas em alertas críticos ou status de robô ativo */
+  .glow-primary {
+    box-shadow: 0 0 16px -4px hsl(var(--primary) / 0.25);
+  }
+  .glow-success {
+    box-shadow: 0 0 14px -4px hsl(var(--success) / 0.2);
+  }
+  .glow-destructive {
+    box-shadow: 0 0 14px -4px hsl(var(--destructive) / 0.2);
+  }
+  
+  /* Gradient text — estático, sem animação perpétua */
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.7) 100%);
+  }
+  
+  @keyframes gradient-shift {
+    0%, 100% { background-position: 0% center; }
+    50% { background-position: 100% center; }
+  }
+  
+  /* Premium gradient border */
+  .gradient-border {
+    position: relative;
+    background: hsl(var(--card));
+    border-radius: var(--radius);
+  }
+  
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.6) 0%, hsl(var(--accent) / 0.6) 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  
+  .gradient-border:hover::before {
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.9) 0%, hsl(var(--accent) / 0.9) 100%);
+  }
+  
+  /* Premium stat card */
+  .stat-card {
+    @apply glass-card p-6 relative overflow-hidden;
+  }
+  
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 120px;
+    height: 120px;
+    background: radial-gradient(circle at top right, hsl(var(--primary) / 0.06) 0%, transparent 65%);
+    pointer-events: none;
+  }
+  
+  /* Premium table styles */
+  .data-table {
+    @apply w-full;
+  }
+  
+  .data-table th {
+    @apply text-xs font-semibold text-muted-foreground uppercase tracking-widest text-left py-4 px-5 border-b border-border/40 bg-muted/20;
+  }
+  
+  .data-table td {
+    @apply py-4 px-5 text-sm border-b border-border/20;
+  }
+  
+  .data-table tbody tr {
+    @apply transition-all duration-200 hover:bg-primary/5;
+  }
+  
+  /* Monospace for numbers - Premium */
+  .font-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  
+  /* Premium sidebar */
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground transition-all duration-300;
+  }
+  
+  .sidebar-link:hover {
+    @apply bg-muted/40 text-foreground translate-x-1;
+  }
+  
+  .sidebar-link.active {
+    @apply bg-primary/10 text-primary font-medium;
+    border-left: 3px solid hsl(var(--primary));
+    padding-left: calc(1rem - 3px);
+  }
+  
+  /* ── Badges semânticos — sem glow, contraste limpo ── */
+
+  /* Lucro / variação positiva */
+  .badge-profit {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-medium;
+    background: rgba(35, 200, 130, 0.12);
+    border: 1px solid rgba(35, 200, 130, 0.25);
+    color: #23C882;
+  }
+
+  /* Perda / variação negativa */
+  .badge-loss {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-medium;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    color: #EF4444;
+  }
+
+  /* Alerta / pendente */
+  .badge-warning {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-medium;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    color: #F59E0B;
+  }
+
+  /* Informativo */
+  .badge-info {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-medium;
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    color: #3B82F6;
+  }
+
+  /* Neutro / sem variação */
+  .badge-neutral {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-medium;
+    background: rgba(107, 114, 128, 0.12);
+    border: 1px solid rgba(107, 114, 128, 0.2);
+    color: #94A3B8;
+  }
+
+  /* Brand — para status de produto (plano, licença) */
+  .badge-brand {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium;
+    background: rgba(35, 200, 130, 0.10);
+    border: 1px solid rgba(35, 200, 130, 0.22);
+    color: #23C882;
+  }
+
+  /* Aliases semânticos para backward compat */
+  .badge-success    { @apply badge-profit; }
+  .badge-destructive { @apply badge-loss; }
+  .badge-primary    { @apply badge-brand; }
+
+  /* ── Price tick — hover em valores financeiros ── */
+  .price-value {
+    transition: color 150ms ease;
+    font-variant-numeric: tabular-nums slashed-zero;
+  }
+  .price-value.tick-up      { color: #23C882; }
+  .price-value.tick-down    { color: #EF4444; }
+  .price-value.tick-neutral { color: #848E9C; }
+
+  /* ── Gradiente de hero de página — uso restrito ── */
+  /* Aplicar apenas em <header> ou hero de página, nunca em cards */
+  .page-hero-gradient {
+    background:
+      linear-gradient(
+        135deg,
+        rgba(35, 200, 130, 0.06) 0%,
+        rgba(11, 14, 17, 0) 55%
+      );
+  }
+
+  /* ── Botão primário — hover sutil, sem glow perpétuo (§8.3) ── */
+  /* Aplicar em botões de ação principal: Ativar Robô, Salvar Config, etc. */
+  .btn-primary {
+    transition: transform 150ms ease-out, box-shadow 150ms ease-out, background-color 150ms ease-out;
+  }
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(35, 200, 130, 0.22);
+  }
+  .btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+
+  /* ── Status de robô ativo — ping funcional (§8.3) ── */
+  /* Aplicar APENAS no dot de status de robô em execução — nunca em cards */
+  .status-active {
+    position: relative;
+  }
+  .status-active::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background: rgba(35, 200, 130, 0.35);
+    animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+    pointer-events: none;
+  }
+}
+
+@layer utilities {
+  /* ── Papéis tipográficos — usar quando não importar o componente React ── */
+
+  /* Dado financeiro (preço, saldo, volume, %) */
+  .role-metric {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums slashed-zero;
+  }
+
+  /* Título de página (H1) */
+  .role-page-title {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
+  }
+
+  /* Header de card / H3 */
+  .role-card-title {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.35;
+  }
+
+  /* Label de seção — uppercase + espaçado */
+  .role-section-label {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 500;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* Timestamp / metadado */
+  .role-timestamp {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 400;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Layout — espaçamento de seção (escala 4pt) ── */
+
+  /* Separador de seção horizontal */
+  .section-divider {
+    border: none;
+    border-top: 1px solid hsl(var(--border));
+    margin: 1.5rem 0; /* 24px — espaço de seção padrão */
+  }
+
+  /* Card padrão com tokens semânticos */
+  .ds-card {
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    padding: 1.5rem; /* p-6 — 24px */
+  }
+
+  /* Card compacto (listas, painéis laterais) */
+  .ds-card-compact {
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    padding: 1rem; /* p-4 — 16px */
+  }
+
+  /* ── Animações funcionais — §8 "Animate data changes, not decorations" ─── */
+
+  /* Entrada padrão de card/lista — usar animationDelay para stagger em listas */
+  .animate-page-enter {
+    animation: fade-up-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* Aliases semânticos → keyframes definidos em tailwind.config.ts */
+  .animate-fade-up {
+    animation: fade-up-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .animate-fade-in {
+    animation: fade-in 0.2s ease-out forwards;
+  }
+  .animate-scale-in {
+    animation: scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .animate-slide-in-right {
+    animation: slide-in-right 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .animate-slide-up {
+    animation: fade-up-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* Shimmer — skeleton loading exclusivamente */
+  .animate-shimmer {
+    animation: shimmer 2s linear infinite;
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted-foreground) / 0.1) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+  }
+
+  /* REMOVIDOS — perpétuos, decorativos, violam §8.4:
+     .animate-rotate-slow  → rotateSlow 20s infinite
+     .animate-bounce-gentle → bounceGentle 2s infinite
+     .animate-spark         → spark 1.5s
+     .animate-flicker       → flicker 3s infinite
+     .animate-float         → float 4s infinite
+     .animate-glow-pulse    → glowPulse infinite
+     .animate-gradient-shift → gradientShift infinite */
+  
+  /* Hover lift — reduzido para 1px (sutil, profissional) */
+  .hover-lift {
+    @apply transition-transform duration-150;
+  }
+  .hover-lift:hover {
+    transform: translateY(-1px);
+  }
+
+  /* gradient-animated-border, text-glow, neon-border removidos — estilo neon excessivo */
+  
+  /* Stagger delays */
+  .delay-100 { animation-delay: 100ms; }
+  .delay-200 { animation-delay: 200ms; }
+  .delay-300 { animation-delay: 300ms; }
+  .delay-400 { animation-delay: 400ms; }
+  .delay-500 { animation-delay: 500ms; }
+  .delay-600 { animation-delay: 600ms; }
+  .delay-700 { animation-delay: 700ms; }
+  .delay-800 { animation-delay: 800ms; }
+}
+
+/* ── Keyframes — ponto de verdade: tailwind.config.ts ───────────────────────
+   fade-up-in, fade-in, scale-in, slide-in, slide-in-right, ping,
+   shimmer, subtle-pulse → injetados automaticamente pelo Tailwind.
+
+   Removidos (decorativos/perpétuos — violam §8.4):
+   fadeUp, pulseGlow, float, glowPulse, gradientShift, slideUp,
+   rotateSlow, bounceGentle, spark, flicker              ── */
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* Number formatting */
+.text-bullish { @apply text-success; }
+.text-bearish { @apply text-destructive; }
+
+/* Bot Analytics Custom Styles */
+/* Removidos (§8.4): medalBounce (perpétuo), glowPulse (decorativo), shimmer duplicado */
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* .animate-medal-bounce removido — perpétuo, decorativo (§8.4) */
+/* animate-glow-pulse removido — decorativo perpétuo */
+
+.animate-slide-in-up {
+  animation: slideInUp 0.5s ease-out;
+}
+
+.glass-card {
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-card:hover {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.shadow-glow-yellow {
+  box-shadow: 0 0 30px rgba(250, 204, 21, 0.4);
+}
+
+.shadow-glow-slate {
+  box-shadow: 0 0 30px rgba(148, 163, 184, 0.3);
+}
+
+.shadow-glow-orange {
+  box-shadow: 0 0 30px rgba(249, 115, 22, 0.4);
+}
+
+/* Bot card premium styles */
+.bot-card-medal {
+  position: relative;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  background-image: 
+    linear-gradient(rgba(15, 23, 42, 0.8), rgba(15, 23, 42, 0.8)),
+    linear-gradient(135deg, var(--medal-color-start, #fbbf24), var(--medal-color-end, #f59e0b));
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+.bot-card-premium {
+  position: relative;
+  overflow: hidden;
+}
+
+.bot-card-premium::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  transition: all 0.5s ease;
+}
+
+.bot-card-premium:hover::before {
+  top: -25%;
+  right: -25%;
+}
+
+/* CSS custom properties para cores de medalha */
+:root {
+  --medal-color-start: #fbbf24;
+  --medal-color-end: #f59e0b;
+}
+
+/* Tabs enhancement */
+@layer components {
+  .tab-gradient-active {
+    @apply bg-gradient-to-r text-white shadow-lg;
+  }
+}
